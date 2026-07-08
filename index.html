@@ -1,0 +1,1981 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grosir Okut - Portal B2B & Admin Panel Modern</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Alpine.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        grosir: {
+                            navy: '#0B2545',
+                            teal: '#139A8C',
+                            gold: '#EEB902',
+                            bg: '#F4F6F9',
+                            dark: '#1E293B',
+                            lightTeal: '#E6F4F2'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        [x-cloak] { display: none !important; }
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+        
+        /* Pengaturan Cetak Struk / Invoice Termal */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #printable-receipt, #printable-receipt * {
+                visibility: visible;
+            }
+            #printable-receipt {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100% !important;
+                max-width: 100% !important;
+                box-shadow: none !important;
+                border: none !important;
+                background: white !important;
+                color: black !important;
+                padding: 10px !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-grosir-bg text-slate-800 flex flex-col min-h-screen" x-data="grosirApp()" x-init="initApp()" x-cloak>
+
+    <div class="fixed top-24 right-4 z-[9999] space-y-3 pointer-events-none max-w-sm w-full no-print">
+        <template x-for="note in notifications" :key="note.id">
+            <div x-transition:enter="transition ease-out duration-300 transform"
+                 x-transition:enter-start="translate-y-2 opacity-0 scale-90"
+                 x-transition:enter-end="translate-y-0 opacity-100 scale-100"
+                 x-transition:leave="transition ease-in duration-200 transform"
+                 x-transition:leave-start="translate-y-0 opacity-100"
+                 x-transition:leave-end="translate-y-2 opacity-0"
+                 class="pointer-events-auto flex items-center p-4 rounded-xl shadow-xl border text-xs font-bold justify-between gap-3 bg-white"
+                 :class="{
+                     'border-emerald-500 text-emerald-800 bg-emerald-50': note.type === 'success',
+                     'border-rose-500 text-rose-800 bg-rose-50': note.type === 'error',
+                     'border-amber-500 text-amber-800 bg-amber-50': note.type === 'warning'
+                 }">
+                <div class="flex items-center space-x-2">
+                    <i :class="{
+                        'fa-solid fa-circle-check text-emerald-500 text-base': note.type === 'success',
+                        'fa-solid fa-circle-xmark text-rose-500 text-base': note.type === 'error',
+                        'fa-solid fa-triangle-exclamation text-amber-500 text-base': note.type === 'warning'
+                    }"></i>
+                    <span x-text="note.message"></span>
+                </div>
+                <button @click="removeNotification(note.id)" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </template>
+    </div>
+
+    <div x-show="!isLoggedIn" class="min-h-screen bg-gradient-to-br from-grosir-navy via-slate-900 to-slate-950 flex items-center justify-center p-4 relative overflow-hidden no-print" x-transition>
+        <!-- Background Decorative Blur Rings -->
+        <div class="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-grosir-teal/15 blur-3xl pointer-events-none"></div>
+        <div class="absolute -bottom-24 -right-24 w-96 h-96 rounded-full bg-grosir-gold/10 blur-3xl pointer-events-none"></div>
+
+        <div class="max-w-md w-full bg-white rounded-3xl shadow-2xl border border-slate-100 p-8 space-y-6 relative z-10">
+            <!-- Brand Centered Logo -->
+            <div class="text-center space-y-2">
+                <div class="inline-flex bg-grosir-teal p-3 rounded-2xl text-white font-black text-2xl tracking-wider items-center shadow-lg">
+                    <i class="fa-solid fa-boxes-packing mr-2 text-grosir-gold"></i> GROSIR<span class="text-grosir-gold">OKUT</span>
+                </div>
+                <p class="text-xs text-slate-400 font-medium">Portal Distribusi & Manajemen B2B Sembako OKU Timur</p>
+            </div>
+
+            <!-- Tabs Switcher for Roles -->
+            <div class="flex bg-slate-100 p-1.5 rounded-2xl">
+                <button @click="loginRole = 'pelanggan'" 
+                        :class="loginRole === 'pelanggan' ? 'bg-white text-grosir-navy shadow font-bold' : 'text-slate-400 hover:text-slate-600'" 
+                        class="flex-grow py-2.5 rounded-xl text-xs transition duration-200">
+                    <i class="fa-solid fa-store mr-1.5"></i> Mitra Pelanggan
+                </button>
+                <button @click="loginRole = 'admin'" 
+                        :class="loginRole === 'admin' ? 'bg-white text-grosir-navy shadow font-bold' : 'text-slate-400 hover:text-slate-600'" 
+                        class="flex-grow py-2.5 rounded-xl text-xs transition duration-200">
+                    <i class="fa-solid fa-user-shield mr-1.5"></i> Staff Gudang
+                </button>
+            </div>
+
+            <div x-show="loginRole === 'pelanggan'" class="space-y-4" x-transition>
+                <div class="text-center pb-2">
+                    <h3 class="font-extrabold text-grosir-navy text-sm">Masuk Sebagai Mitra Toko / Warung</h3>
+                    <p class="text-4xs text-slate-400">Silakan isi identitas outlet untuk mencatat transaksi secara otomatis.</p>
+                </div>
+                <div class="space-y-3 text-xs">
+                    <div>
+                        <label class="text-4xs font-bold text-slate-400 uppercase block mb-1">Nama Toko / Outlet / Pengecer</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                                <i class="fa-solid fa-shop"></i>
+                            </span>
+                            <input type="text" x-model="loginForm.outletName" placeholder="Contoh: Toko Manunggal Jaya" class="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-grosir-teal">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-4xs font-bold text-slate-400 uppercase block mb-1">Nomor HP / WhatsApp Aktif</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                                <i class="fa-solid fa-phone"></i>
+                            </span>
+                            <input type="text" x-model="loginForm.phone" placeholder="Contoh: 081271002026" class="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-grosir-teal">
+                        </div>
+                    </div>
+                    <button @click="loginAsPelanggan()" class="w-full bg-grosir-teal hover:bg-emerald-600 text-white font-black py-3 rounded-xl shadow-md transition text-xs">
+                        Masuk Ke Katalog & Berbelanja
+                    </button>
+                </div>
+            </div>
+
+            <div x-show="loginRole === 'admin'" class="space-y-4" x-transition>
+                <div class="text-center pb-2">
+                    <h3 class="font-extrabold text-grosir-navy text-sm">Otorisasi Akses Staff Gudang</h3>
+                    <p class="text-4xs text-slate-400">Gunakan PIN otorisasi internal untuk mengelola stok, logistik, & pesanan.</p>
+                </div>
+                <div class="space-y-3 text-xs">
+                    <div>
+                        <label class="text-4xs font-bold text-slate-400 uppercase block mb-1">PIN Keamanan Admin</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                                <i class="fa-solid fa-lock"></i>
+                            </span>
+                            <input type="password" x-model="loginForm.pin" placeholder="Masukkan PIN" class="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-center tracking-widest text-lg font-black focus:outline-none focus:ring-2 focus:ring-grosir-teal" @keyup.enter="loginAsAdmin()">
+                        </div>
+                    </div>
+                    <div class="p-2.5 bg-amber-50 rounded-xl border border-amber-200 text-[10px] text-amber-700 font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-triangle-exclamation text-xs"></i>
+                        <span>Kode PIN Demo: <strong class="underline">1234</strong></span>
+                    </div>
+                    <button @click="loginAsAdmin()" class="w-full bg-grosir-navy hover:bg-grosir-teal text-white font-black py-3 rounded-xl shadow-md transition text-xs">
+                        Otorisasi & Masuk Panel Admin
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="showReceiptModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 overflow-y-auto" x-transition>
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-6 my-8 no-print" @click.away="showReceiptModal = false">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="font-black text-grosir-navy text-sm uppercase flex items-center"><i class="fa-solid fa-receipt mr-2 text-grosir-teal"></i> Struk Belanja Digital</h3>
+                <button @click="showReceiptModal = false" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Area Desain Struk (Printable) -->
+            <div class="bg-slate-50 p-6 rounded-2xl border border-dashed border-slate-200 relative overflow-hidden" id="printable-receipt">
+                <!-- Watermark Stempel Lunas / Belum Bayar -->
+                <template x-if="receiptOrder">
+                    <div class="absolute right-4 top-16 transform rotate-12 z-0 opacity-20 pointer-events-none select-none border-4 font-black text-2xl uppercase px-4 py-2 rounded-xl"
+                         :class="{
+                             'border-emerald-600 text-emerald-600': receiptOrder.status === 'Lunas - Diproses' || receiptOrder.status === 'Dikirim' || receiptOrder.status === 'Selesai',
+                             'border-rose-600 text-rose-600': receiptOrder.status === 'Belum Bayar',
+                             'border-blue-600 text-blue-600': receiptOrder.status === 'Menunggu Konfirmasi'
+                         }">
+                        <span x-text="receiptOrder.status === 'Belum Bayar' ? 'BELUM LUNAS' : (receiptOrder.status === 'Menunggu Konfirmasi' ? 'PENDING' : 'LUNAS')"></span>
+                    </div>
+                </template>
+
+                <!-- Header Struk -->
+                <div class="text-center space-y-1 mb-4 border-b pb-3 border-slate-200">
+                    <h4 class="font-black text-lg text-grosir-navy tracking-wider">GROSIR OKUT</h4>
+                    <p class="text-[10px] text-slate-500">Gudang Utama Distribusi B2B Sembako</p>
+                    <p class="text-[9px] text-slate-400">Jl. Merdeka No. 45, Martapura, OKU Timur</p>
+                    <p class="text-[9px] text-slate-400">Telp: 0812-7100-2026</p>
+                </div>
+
+                <!-- Info Invoice -->
+                <template x-if="receiptOrder">
+                    <div class="text-[11px] space-y-1 text-slate-600 mb-3 font-mono">
+                        <div class="flex justify-between">
+                            <span>No. Nota:</span>
+                            <span class="font-bold text-slate-800" x-text="'#' + receiptOrder.id"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Tanggal:</span>
+                            <span x-text="receiptOrder.date"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Outlet:</span>
+                            <span class="font-bold text-slate-800" x-text="receiptOrder.outlet"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Telepon:</span>
+                            <span x-text="receiptOrder.phone"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Kecamatan:</span>
+                            <span x-text="receiptOrder.district"></span>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Garis Pembatas Slip -->
+                <div class="border-t border-dashed border-slate-300 my-2"></div>
+
+                <!-- Detail Item Pembelian -->
+                <div class="space-y-3 font-mono text-[11px]">
+                    <template x-if="receiptOrder">
+                        <template x-for="item in receiptOrder.items" :key="item.name">
+                            <div class="space-y-0.5">
+                                <span class="font-bold text-slate-800 block" x-text="item.name"></span>
+                                <div class="flex justify-between text-slate-500">
+                                    <span x-text="item.qty + ' ' + item.unit + ' x ' + formatRupiah(item.price)"></span>
+                                    <span class="font-bold text-slate-700" x-text="formatRupiah(item.price * item.qty)"></span>
+                                </div>
+                            </div>
+                        </template>
+                    </template>
+                </div>
+
+                <!-- Garis Pembatas Slip -->
+                <div class="border-t border-dashed border-slate-300 my-3"></div>
+
+                <!-- Perhitungan Akhir -->
+                <template x-if="receiptOrder">
+                    <div class="text-[11px] space-y-1.5 font-mono text-slate-700">
+                        <div class="flex justify-between">
+                            <span>Total Item:</span>
+                            <span class="font-bold" x-text="receiptOrder.items.length + ' Macam'"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Berat Kargo:</span>
+                            <span class="font-bold" x-text="receiptOrder.weight + ' Kg'"></span>
+                        </div>
+                        <div class="flex justify-between text-xs text-grosir-navy border-t pt-1.5 font-sans font-black">
+                            <span>TOTAL BAYAR:</span>
+                            <span class="text-grosir-teal text-sm" x-text="formatRupiah(receiptOrder.total)"></span>
+                        </div>
+                    </div>
+                </template>
+
+                <div class="border-t border-dashed border-slate-300 my-3"></div>
+
+                <!-- Footer Struk -->
+                <div class="text-center space-y-1">
+                    <p class="text-[9px] text-slate-400 uppercase font-bold tracking-widest">Terima Kasih</p>
+                    <p class="text-[8px] text-slate-400">Telah menjadi mitra pasokan setia Grosir Okut.</p>
+                    <p class="text-[8px] text-slate-300 italic">*Simpan struk ini sebagai bukti pembayaran digital yang sah.</p>
+                </div>
+            </div>
+
+            <!-- Aksi Tombol Modal -->
+            <div class="flex gap-2">
+                <button @click="printReceipt()" class="flex-grow bg-grosir-teal hover:bg-emerald-600 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-md">
+                    <i class="fa-solid fa-print text-sm"></i> Cetak Struk / Nota
+                </button>
+                <button @click="showReceiptModal = false" class="bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold py-2.5 px-4 rounded-xl text-xs transition">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="isLoggedIn" class="min-h-screen flex flex-col bg-grosir-bg" x-transition>
+        
+        <!-- HEADER & NAVIGATION (LOGGED IN) -->
+        <header class="bg-grosir-navy text-white sticky top-0 z-50 shadow-lg no-print">
+            <!-- Top Info Bar -->
+            <div class="bg-grosir-dark/30 border-b border-white/10 py-1.5 px-4 text-xs">
+                <div class="container mx-auto flex justify-between items-center">
+                    <span><i class="fa-solid fa-truck-ramp-box text-grosir-gold mr-1.5"></i> Portal Resmi Distributor B2B - Khusus Toko, Warung, & Reseller</span>
+                    <span class="text-grosir-gold font-extrabold" x-show="adminMode"><i class="fa-solid fa-user-shield mr-1"></i> Mode Admin Aktif (Gudang Utama OKUT)</span>
+                    <span class="hidden sm:inline" x-show="!adminMode"><i class="fa-solid fa-store text-grosir-gold mr-1.5"></i> Masuk Sebagai: <strong class="text-white" x-text="shippingForm.name"></strong></span>
+                </div>
+            </div>
+            <!-- Main Navbar -->
+            <div class="container mx-auto px-4 py-4 flex flex-col lg:flex-row justify-between items-center gap-4">
+                <div class="flex items-center justify-between w-full lg:w-auto">
+                    <div class="flex items-center space-x-3 cursor-pointer" @click="setView('home')">
+                        <div class="bg-grosir-teal p-2 rounded-xl text-white font-black text-2xl tracking-wider flex items-center shadow-md">
+                            <i class="fa-solid fa-boxes-packing mr-2 text-grosir-gold"></i> GROSIR<span class="text-grosir-gold">OKUT</span>
+                        </div>
+                    </div>
+                    <!-- Cart Trigger for Mobile -->
+                    <button @click="setView('cart')" class="lg:hidden relative p-2.5 bg-grosir-teal/20 rounded-xl text-grosir-gold" x-show="!adminMode">
+                        <i class="fa-solid fa-cart-shopping text-xl"></i>
+                        <span class="absolute -top-1 -right-1 bg-rose-500 text-white rounded-full text-2xs font-extrabold w-5 h-5 flex items-center justify-center border-2 border-grosir-navy" x-text="getCartItemCount()"></span>
+                    </button>
+                </div>
+
+                <!-- Navigation Links -->
+                <nav class="flex flex-wrap gap-2 text-sm justify-center">
+                    <!-- User Nav Links -->
+                    <template x-if="!adminMode">
+                        <div class="flex flex-wrap gap-2 justify-center">
+                            <button @click="setView('home')" :class="view === 'home' ? 'bg-grosir-teal text-white font-bold' : 'text-slate-300 hover:text-white'" class="px-4 py-2 rounded-xl transition">
+                                <i class="fa-solid fa-house mr-1"></i> Beranda
+                            </button>
+                            <button @click="setView('catalog')" :class="view === 'catalog' || view === 'detail' ? 'bg-grosir-teal text-white font-bold' : 'text-slate-300 hover:text-white'" class="px-4 py-2 rounded-xl transition">
+                                <i class="fa-solid fa-box-open mr-1"></i> Katalog Produk
+                            </button>
+                            <button @click="setView('cart')" :class="view === 'cart' ? 'bg-grosir-teal text-white font-bold' : 'text-slate-300 hover:text-white'" class="px-4 py-2 rounded-xl transition relative inline-flex items-center">
+                                <i class="fa-solid fa-cart-shopping mr-1.5"></i> Keranjang
+                                <span class="ml-1 bg-grosir-gold text-grosir-navy rounded-full text-3xs font-extrabold px-1.5 py-0.5" x-text="getCartItemCount()"></span>
+                            </button>
+                            <button @click="setView('history')" :class="view === 'history' ? 'bg-grosir-teal text-white font-bold' : 'text-slate-300 hover:text-white'" class="px-4 py-2 rounded-xl transition">
+                                <i class="fa-solid fa-file-invoice-dollar mr-1"></i> Riwayat Pesanan
+                            </button>
+                            <button @click="setView('about')" :class="view === 'about' ? 'bg-grosir-teal text-white font-bold' : 'text-slate-300 hover:text-white'" class="px-4 py-2 rounded-xl transition">
+                                <i class="fa-solid fa-circle-info mr-1"></i> Tentang Kami
+                            </button>
+                            <button @click="setView('contact')" :class="view === 'contact' ? 'bg-grosir-teal text-white font-bold' : 'text-slate-300 hover:text-white'" class="px-4 py-2 rounded-xl transition">
+                                <i class="fa-solid fa-headset mr-1"></i> Kontak
+                            </button>
+                        </div>
+                    </template>
+
+                    <!-- Admin Nav Links -->
+                    <template x-if="adminMode">
+                        <div class="flex flex-wrap gap-2 justify-center">
+                            <button @click="adminActiveTab = 'dashboard'" :class="adminActiveTab === 'dashboard' ? 'bg-grosir-gold text-grosir-navy font-bold' : 'text-slate-300 hover:text-white'" class="px-4 py-2 rounded-xl transition">
+                                <i class="fa-solid fa-chart-line mr-1"></i> Ringkasan Dasbor
+                            </button>
+                            <button @click="adminActiveTab = 'orders'" :class="adminActiveTab === 'orders' ? 'bg-grosir-gold text-grosir-navy font-bold' : 'text-slate-300 hover:text-white'" class="px-4 py-2 rounded-xl transition">
+                                <i class="fa-solid fa-file-invoice-dollar mr-1"></i> Kelola Invoice
+                            </button>
+                            <button @click="adminActiveTab = 'products'" :class="adminActiveTab === 'products' ? 'bg-grosir-gold text-grosir-navy font-bold' : 'text-slate-300 hover:text-white'" class="px-4 py-2 rounded-xl transition">
+                                <i class="fa-solid fa-cubes mr-1"></i> Kelola Katalog
+                            </button>
+                            <button @click="adminActiveTab = 'messages'" :class="adminActiveTab === 'messages' ? 'bg-grosir-gold text-grosir-navy font-bold' : 'text-slate-300 hover:text-white'" class="px-4 py-2 rounded-xl transition relative inline-flex items-center">
+                                <i class="fa-solid fa-envelope mr-1"></i> Pesan Masuk
+                                <span class="ml-1 bg-rose-500 text-white rounded-full text-3xs font-extrabold px-1.5 py-0.5" x-show="messages.length > 0" x-text="messages.length"></span>
+                            </button>
+                        </div>
+                    </template>
+
+                    <!-- Logout Button (Kembali Ke Portal Log) -->
+                    <button @click="logout()" class="px-4 py-2 rounded-xl bg-rose-600 border border-rose-500 text-white hover:bg-rose-700 font-bold transition flex items-center shadow">
+                        <i class="fa-solid fa-right-from-bracket mr-1"></i> Keluar Portal
+                    </button>
+                </nav>
+            </div>
+        </header>
+
+        <!-- MAIN BODY CONTENT -->
+        <main class="flex-grow container mx-auto px-4 py-8 no-print">
+
+            <!-- ================= SISI MITRA PELANGGAN ================= -->
+            <template x-if="!adminMode">
+                <div class="space-y-12">
+                    
+                    <!-- 1. HALAMAN BERANDA -->
+                    <div x-show="view === 'home'" class="space-y-12" x-transition>
+                        <!-- Hero Banner -->
+                        <div class="relative bg-gradient-to-r from-grosir-navy to-slate-900 rounded-3xl overflow-hidden shadow-2xl text-white p-8 md:p-16">
+                            <div class="absolute right-0 bottom-0 opacity-15 pointer-events-none transform translate-y-12 translate-x-12">
+                                <i class="fa-solid fa-warehouse text-[24rem]"></i>
+                            </div>
+                            <div class="max-w-xl space-y-5 relative z-10">
+                                <span class="bg-grosir-gold text-grosir-navy font-black text-xs px-3 py-1 rounded-full uppercase tracking-wider">HARGA DISTRIBUTOR TANGAN PERTAMA</span>
+                                <h1 class="text-4xl md:text-5xl font-black leading-tight">Belanja Grosir Sembako & Kebutuhan Warung Okut</h1>
+                                <p class="text-slate-300 text-base">Grosir Okut menyuplai ribuan warung sembako, pengecer, reseller, dan pelaku UMKM dengan sistem pembayaran invoice aman serta pengiriman kargo lokal andal.</p>
+                                <div class="flex flex-wrap gap-3">
+                                    <button @click="setView('catalog')" class="bg-grosir-teal hover:bg-emerald-600 text-white font-bold px-6 py-3 rounded-xl transition shadow-lg flex items-center">
+                                        <i class="fa-solid fa-magnifying-glass mr-2"></i> Belanja Sekarang
+                                    </button>
+                                    <button @click="setView('about')" class="bg-white/10 hover:bg-white/20 text-white font-bold px-6 py-3 rounded-xl transition flex items-center border border-white/20">
+                                        Profil Perusahaan
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-6">
+                            <div class="flex justify-between items-end">
+                                <div>
+                                    <span class="text-xs font-bold text-grosir-teal uppercase tracking-widest block">KATEGORI PRODUK</span>
+                                    <h2 class="text-2xl font-black text-grosir-navy">Pasokan Terlengkap Gudang Kami</h2>
+                                </div>
+                                <button @click="setView('catalog')" class="text-sm font-bold text-grosir-teal hover:underline">Lihat Semua Kategori <i class="fa-solid fa-arrow-right ml-1"></i></button>
+                            </div>
+                            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                                <template x-for="cat in categories" :key="cat.name">
+                                    <div @click="selectCategory(cat.name)" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:border-grosir-teal hover:shadow-md cursor-pointer transition text-center space-y-3">
+                                        <div class="w-12 h-12 rounded-xl bg-grosir-lightTeal text-grosir-teal flex items-center justify-center mx-auto text-xl">
+                                            <i :class="cat.icon"></i>
+                                        </div>
+                                        <h4 class="font-extrabold text-sm text-grosir-navy" x-text="cat.name"></h4>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <div class="space-y-6">
+                            <div>
+                                <span class="text-xs font-bold text-grosir-teal uppercase tracking-widest block">BARANG REKOMENDASI</span>
+                                <h2 class="text-2xl font-black text-grosir-navy">Produk Paling Laris & Unggulan</h2>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                <template x-for="prod in products.slice(0, 4)" :key="prod.id">
+                                    <div class="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100 hover:shadow-lg transition flex flex-col justify-between">
+                                        <div class="p-4 space-y-4">
+                                            <div class="bg-slate-50 h-40 rounded-xl relative overflow-hidden flex items-center justify-center">
+                                                <span class="absolute top-2 left-2 bg-grosir-gold text-grosir-navy text-3xs font-extrabold px-2 py-0.5 rounded uppercase z-10" x-text="prod.package"></span>
+                                                <img :src="prod.image" :alt="prod.name" class="w-full h-full object-cover transition duration-300 hover:scale-105" onerror="this.src='https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=80'">
+                                            </div>
+                                            <div class="space-y-1">
+                                                <span class="text-3xs font-extrabold uppercase text-grosir-teal" x-text="prod.category"></span>
+                                                <h3 class="font-bold text-sm text-grosir-navy line-clamp-2 h-10" x-text="prod.name"></h3>
+                                                <p class="text-xs text-slate-400">Minimal Pembelian (MOQ): <strong class="text-grosir-navy" x-text="prod.moq + ' ' + prod.unit"></strong></p>
+                                            </div>
+                                        </div>
+                                        <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                                            <div>
+                                                <span class="text-4xs text-slate-400 block uppercase font-bold">Harga Grosir</span>
+                                                <span class="font-black text-base text-grosir-teal" x-text="formatRupiah(prod.price)"></span>
+                                            </div>
+                                            <button @click="showProductDetail(prod)" class="bg-grosir-navy hover:bg-grosir-teal text-white p-2.5 rounded-xl transition shadow">
+                                                <i class="fa-solid fa-cart-plus"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. HALAMAN KATALOG PRODUK -->
+                    <div x-show="view === 'catalog'" class="space-y-6" x-transition>
+                        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div>
+                                <span class="text-xs text-slate-400 block font-bold uppercase">PENELUSURAN GUDANG</span>
+                                <h2 class="text-xl font-black text-grosir-navy flex items-center">
+                                    <i class="fa-solid fa-warehouse mr-2 text-grosir-teal"></i> Katalog Persediaan Grosir Utama
+                                </h2>
+                            </div>
+                            <div class="relative w-full md:w-80">
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                                    <i class="fa-solid fa-magnifying-glass"></i>
+                                </span>
+                                <input type="text" x-model="searchQuery" placeholder="Cari nama produk grosir..." class="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-9 pr-4 focus:outline-none focus:ring-2 focus:ring-grosir-teal transition text-sm">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                            <!-- Filter Sidebar -->
+                            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-6 h-fit">
+                                <div class="flex justify-between items-center border-b pb-3">
+                                    <h3 class="font-black text-slate-700 flex items-center"><i class="fa-solid fa-sliders mr-2 text-grosir-teal"></i> Filter Produk</h3>
+                                    <button @click="resetFilters()" class="text-xs text-rose-500 hover:underline">Reset</button>
+                                </div>
+
+                                <!-- Filter Kategori -->
+                                <div class="space-y-2">
+                                    <span class="text-2xs font-extrabold text-slate-400 uppercase tracking-widest block">Kategori</span>
+                                    <div class="space-y-1.5 max-h-48 overflow-y-auto pr-2">
+                                        <label class="flex items-center space-x-2 text-xs cursor-pointer">
+                                            <input type="radio" name="cat" x-model="selectedCat" value="Semua" class="text-grosir-teal focus:ring-grosir-teal">
+                                            <span class="font-semibold text-slate-600">Semua Kategori</span>
+                                        </label>
+                                        <template x-for="cat in categories" :key="cat.name">
+                                            <label class="flex items-center space-x-2 text-xs cursor-pointer">
+                                                <input type="radio" name="cat" x-model="selectedCat" :value="cat.name" class="text-grosir-teal focus:ring-grosir-teal">
+                                                <span class="font-semibold text-slate-600" x-text="cat.name"></span>
+                                            </label>
+                                        </template>
+                                    </div>
+                                </div>
+
+                                <!-- Urutan Harga -->
+                                <div class="space-y-2">
+                                    <span class="text-2xs font-extrabold text-slate-400 uppercase tracking-widest block">Urutkan</span>
+                                    <select x-model="sortBy" class="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-grosir-teal">
+                                        <option value="default">Relevansi</option>
+                                        <option value="price-asc">Harga Terendah</option>
+                                        <option value="price-desc">Harga Tertinggi</option>
+                                        <option value="moq-asc">MOQ Terkecil</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Products Grid -->
+                            <div class="lg:col-span-3 space-y-6">
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <template x-for="prod in filteredProducts()" :key="prod.id">
+                                        <div class="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100 hover:shadow-lg transition flex flex-col justify-between">
+                                            <div class="p-4 space-y-4">
+                                                <div class="bg-slate-50 h-36 rounded-xl relative overflow-hidden flex items-center justify-center">
+                                                    <span class="absolute top-2 left-2 bg-grosir-gold text-grosir-navy text-4xs font-extrabold px-2 py-0.5 rounded uppercase z-10" x-text="prod.package"></span>
+                                                    <img :src="prod.image" :alt="prod.name" class="w-full h-full object-cover transition duration-300 hover:scale-105" onerror="this.src='https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=80'">
+                                                </div>
+                                                <div class="space-y-1">
+                                                    <span class="text-4xs font-extrabold uppercase text-grosir-teal" x-text="prod.category"></span>
+                                                    <h3 class="font-bold text-sm text-grosir-navy line-clamp-2 h-10" x-text="prod.name"></h3>
+                                                    <div class="flex justify-between text-2xs text-slate-400">
+                                                        <span>Min. Order (MOQ):</span>
+                                                        <strong class="text-grosir-navy" x-text="prod.moq + ' ' + prod.unit"></strong>
+                                                    </div>
+                                                    <div class="flex justify-between text-2xs text-slate-400">
+                                                        <span>Stok Gudang:</span>
+                                                        <strong class="text-emerald-600" x-text="prod.stock + ' ' + prod.unit"></strong>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                                                <div>
+                                                    <span class="text-4xs text-slate-400 block uppercase font-bold">Harga Grosir</span>
+                                                    <span class="font-black text-sm text-grosir-teal" x-text="formatRupiah(prod.price)"></span>
+                                                </div>
+                                                <button @click="showProductDetail(prod)" class="bg-grosir-navy hover:bg-grosir-teal text-white px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                                                    <span>Order</span> <i class="fa-solid fa-cart-plus"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+
+                                <!-- Empty State -->
+                                <div x-show="filteredProducts().length === 0" class="bg-white p-12 rounded-3xl text-center text-slate-400 border border-slate-100">
+                                    <i class="fa-regular fa-folder-open text-6xl mb-4 text-slate-300"></i>
+                                    <p class="font-black text-lg text-grosir-navy">Produk Tidak Ditemukan</p>
+                                    <p class="text-sm">Silakan ubah kata kunci atau pengaturan filter Anda.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. HALAMAN DETAIL PRODUK -->
+                    <div x-show="view === 'detail'" class="max-w-4xl mx-auto space-y-6" x-transition>
+                        <button @click="setView('catalog')" class="text-grosir-navy font-bold flex items-center hover:underline text-sm">
+                            <i class="fa-solid fa-arrow-left mr-2"></i> Kembali ke Katalog Produk
+                        </button>
+
+                        <template x-if="selectedProduct">
+                            <div class="bg-white rounded-3xl overflow-hidden shadow-xl border border-slate-100 grid grid-cols-1 md:grid-cols-12 gap-8 p-6 md:p-8">
+                                <!-- Images -->
+                                <div class="md:col-span-5 space-y-4">
+                                    <div class="bg-slate-50 rounded-2xl h-[300px] overflow-hidden relative flex items-center justify-center border">
+                                        <span class="absolute top-4 left-4 bg-grosir-gold text-grosir-navy font-black text-2xs px-3 py-1 rounded-full uppercase z-10" x-text="selectedProduct.package"></span>
+                                        <img :src="selectedProduct.image" :alt="selectedProduct.name" class="w-full h-full object-cover" onerror="this.src='https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=80'">
+                                    </div>
+                                    <div class="grid grid-cols-3 gap-2">
+                                        <div class="border rounded-xl h-20 overflow-hidden cursor-pointer border-grosir-teal">
+                                            <img :src="selectedProduct.image" :alt="selectedProduct.name" class="w-full h-full object-cover" onerror="this.src='https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=80'">
+                                        </div>
+                                        <div class="border rounded-xl h-20 flex items-center justify-center bg-slate-50 cursor-pointer hover:border-grosir-teal">
+                                            <i class="fa-solid fa-warehouse text-2xl text-slate-300"></i>
+                                        </div>
+                                        <div class="border rounded-xl h-20 flex items-center justify-center bg-slate-50 cursor-pointer hover:border-grosir-teal">
+                                            <i class="fa-solid fa-truck-ramp-box text-2xl text-slate-300"></i>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Details -->
+                                <div class="md:col-span-7 space-y-6">
+                                    <div class="space-y-2">
+                                        <span class="text-xs font-black uppercase tracking-wider text-grosir-teal" x-text="selectedProduct.category"></span>
+                                        <h2 class="text-2xl font-black text-grosir-navy" x-text="selectedProduct.name"></h2>
+                                    </div>
+
+                                    <!-- Price Tiers -->
+                                    <div class="p-4 bg-grosir-lightTeal rounded-2xl border border-grosir-teal/20">
+                                        <span class="text-4xs font-bold text-grosir-teal uppercase tracking-widest block">HARGA DISTRIBUTOR GROSIR</span>
+                                        <div class="flex items-baseline space-x-2">
+                                            <h3 class="text-3xl font-black text-grosir-teal" x-text="formatRupiah(selectedProduct.price)"></h3>
+                                            <span class="text-slate-400 text-xs font-bold">/ <span x-text="selectedProduct.unit"></span></span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Specs Table -->
+                                    <div class="grid grid-cols-2 gap-4 text-xs border-y py-4">
+                                        <div>
+                                            <span class="text-slate-400 block uppercase font-bold text-4xs">Minimal Pembelian (MOQ)</span>
+                                            <span class="font-extrabold text-grosir-navy text-sm" x-text="selectedProduct.moq + ' ' + selectedProduct.unit"></span>
+                                        </div>
+                                        <div>
+                                            <span class="text-slate-400 block uppercase font-bold text-4xs">Ketersediaan Stok</span>
+                                            <span class="font-extrabold text-emerald-600 text-sm" x-text="selectedProduct.stock + ' ' + selectedProduct.unit"></span>
+                                        </div>
+                                        <div>
+                                            <span class="text-slate-400 block uppercase font-bold text-4xs">Berat Kargo</span>
+                                            <span class="font-extrabold text-grosir-navy text-sm" x-text="selectedProduct.weightGram + ' gram / ' + selectedProduct.unit"></span>
+                                        </div>
+                                        <div>
+                                            <span class="text-slate-400 block uppercase font-bold text-4xs">Bentuk Satuan Kemas</span>
+                                            <span class="font-extrabold text-grosir-navy text-sm" x-text="selectedProduct.package"></span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Description -->
+                                    <div class="space-y-2">
+                                        <h4 class="font-bold text-xs uppercase tracking-wider text-slate-400">Deskripsi Distribusi</h4>
+                                        <p class="text-sm text-slate-500 leading-relaxed" x-text="selectedProduct.description"></p>
+                                    </div>
+
+                                    <!-- Add to Cart Widget -->
+                                    <div class="bg-slate-50 p-4 rounded-2xl border space-y-4">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-xs font-bold text-slate-500">Kuantitas Pesanan:</span>
+                                            <div class="flex items-center space-x-2">
+                                                <button @click="decrementDetailQty()" class="w-8 h-8 rounded-lg bg-white border flex items-center justify-center font-bold hover:bg-slate-100">-</button>
+                                                <input type="number" x-model.number="detailQty" class="w-16 text-center border rounded-lg py-1 font-bold text-sm bg-white focus:outline-none focus:ring-1 focus:ring-grosir-teal">
+                                                <button @click="incrementDetailQty()" class="w-8 h-8 rounded-lg bg-white border flex items-center justify-center font-bold hover:bg-slate-100">+</button>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-3 pt-2">
+                                            <button @click="addToCart(selectedProduct, detailQty)" class="flex-grow bg-grosir-teal hover:bg-emerald-600 text-white font-bold py-3 rounded-xl transition shadow flex items-center justify-center gap-2 text-sm">
+                                                <i class="fa-solid fa-cart-arrow-down"></i> Masukkan Keranjang
+                                            </button>
+                                            <button @click="setView('catalog')" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-4 py-3 rounded-xl transition text-sm">
+                                                Batal
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- 4. HALAMAN KERANJANG BELANJA -->
+                    <div x-show="view === 'cart'" class="space-y-6" x-transition>
+                        <h2 class="text-2xl font-black text-grosir-navy flex items-center">
+                            <i class="fa-solid fa-cart-flatbed mr-3 text-grosir-teal"></i> Keranjang Belanja Grosir Anda
+                        </h2>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                            <!-- List Keranjang -->
+                            <div class="lg:col-span-8 space-y-4">
+                                <template x-if="cart.length === 0">
+                                    <div class="bg-white p-12 rounded-3xl text-center text-slate-400 border border-slate-100">
+                                        <i class="fa-solid fa-cart-plus text-6xl mb-4 text-slate-200"></i>
+                                        <h3 class="font-black text-lg text-grosir-navy">Keranjang Masih Kosong</h3>
+                                        <p class="text-sm mb-6">Belum ada barang grosir yang ditambahkan ke rencana pasokan.</p>
+                                        <button @click="setView('catalog')" class="bg-grosir-teal hover:bg-emerald-600 text-white font-bold px-6 py-2.5 rounded-xl transition text-sm inline-flex items-center gap-2">
+                                            <i class="fa-solid fa-magnifying-glass"></i> Cari Barang
+                                        </button>
+                                    </div>
+                                </template>
+
+                                <template x-for="item in cart" :key="item.product.id">
+                                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4">
+                                        <div class="flex items-center space-x-4 w-full md:w-auto">
+                                            <div class="w-16 h-16 bg-slate-50 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center">
+                                                <img :src="item.product.image" :alt="item.product.name" class="w-full h-full object-cover" onerror="this.src='https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=80'">
+                                            </div>
+                                            <div class="space-y-1">
+                                                <span class="text-4xs font-bold text-grosir-teal uppercase" x-text="item.product.category"></span>
+                                                <h4 class="font-extrabold text-sm text-grosir-navy line-clamp-1" x-text="item.product.name"></h4>
+                                                <div class="flex items-center space-x-3 text-2xs text-slate-400">
+                                                    <span>Harga: <strong class="text-grosir-teal" x-text="formatRupiah(item.product.price)"></strong></span>
+                                                    <span>Min. MOQ: <span class="text-slate-600 font-bold" x-text="item.product.moq + ' ' + item.product.unit"></span></span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="flex items-center justify-between w-full md:w-auto gap-6 border-t md:border-t-0 pt-3 md:pt-0">
+                                            <!-- Qty Selector -->
+                                            <div class="flex items-center space-x-2">
+                                                <button @click="updateCartQty(item.product.id, item.quantity - 1)" class="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center font-bold text-sm hover:bg-slate-200">-</button>
+                                                <input type="number" :value="item.quantity" @change="updateCartQty(item.product.id, parseInt($event.target.value))" class="w-12 text-center border rounded-lg py-0.5 text-xs font-bold bg-white">
+                                                <button @click="updateCartQty(item.product.id, item.quantity + 1)" class="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center font-bold text-sm hover:bg-slate-200">+</button>
+                                                <span class="text-xs text-slate-500 font-semibold" x-text="item.product.unit"></span>
+                                            </div>
+
+                                            <!-- Subtotal & Delete -->
+                                            <div class="text-right flex items-center space-x-4">
+                                                <div>
+                                                    <span class="text-4xs text-slate-400 block uppercase">Subtotal</span>
+                                                    <span class="font-black text-sm text-grosir-navy" x-text="formatRupiah(item.product.price * item.quantity)"></span>
+                                                </div>
+                                                <button @click="removeFromCart(item.product.id)" class="text-rose-500 hover:text-rose-700 p-2 rounded-lg hover:bg-rose-50 transition">
+                                                    <i class="fa-regular fa-trash-can text-base"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <!-- Summary & Order Form -->
+                            <div class="lg:col-span-4 space-y-6" x-show="cart.length > 0">
+                                <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-4">
+                                    <h3 class="font-black text-grosir-navy border-b pb-3 flex items-center"><i class="fa-solid fa-file-invoice mr-2 text-grosir-teal"></i> Ringkasan Pasokan</h3>
+                                    
+                                    <div class="space-y-2 text-xs">
+                                        <div class="flex justify-between text-slate-500">
+                                            <span>Total Item Grosir:</span>
+                                            <strong class="text-slate-700" x-text="getCartItemCount() + ' Unit'"></strong>
+                                        </div>
+                                        <div class="flex justify-between text-slate-500">
+                                            <span>Estimasi Total Berat:</span>
+                                            <strong class="text-slate-700" x-text="getCartTotalWeight() + ' Kg'"></strong>
+                                        </div>
+                                        <div class="flex justify-between text-slate-500 border-b pb-2">
+                                            <span>Subtotal Nilai Barang:</span>
+                                            <strong class="text-grosir-navy font-bold" x-text="formatRupiah(getCartTotal())"></strong>
+                                        </div>
+                                    </div>
+
+                                    <!-- Pengiriman & Alamat Form -->
+                                    <div class="space-y-3 pt-2">
+                                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider"><i class="fa-solid fa-location-dot text-grosir-teal mr-1"></i> Data Pengiriman & Outlet</h4>
+                                        <div class="space-y-2.5">
+                                            <div>
+                                                <label class="text-4xs font-bold text-slate-400 uppercase block mb-1">Nama Pemilik / Outlet</label>
+                                                <input type="text" x-model="shippingForm.name" placeholder="Contoh: Toko Berkah Jaya" class="w-full bg-slate-50 border rounded-xl py-2 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-grosir-teal">
+                                            </div>
+                                            <div>
+                                                <label class="text-4xs font-bold text-slate-400 uppercase block mb-1">Nomor Kontak / Handphone</label>
+                                                <input type="text" x-model="shippingForm.phone" placeholder="Contoh: 0812xxxxxxxx" class="w-full bg-slate-50 border rounded-xl py-2 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-grosir-teal">
+                                            </div>
+                                            <div>
+                                                <label class="text-4xs font-bold text-slate-400 uppercase block mb-1">Kecamatan (Wilayah OKU Timur)</label>
+                                                <select x-model="shippingForm.district" class="w-full bg-slate-50 border rounded-xl py-2 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-grosir-teal">
+                                                    <option value="">-- Pilih Kecamatan --</option>
+                                                    <option value="Martapura">Martapura</option>
+                                                    <option value="Belitang">Belitang</option>
+                                                    <option value="Buay Madang">Buay Madang</option>
+                                                    <option value="Cempaka">Cempaka</option>
+                                                    <option value="Semendawai Suku III">Semendawai Suku III</option>
+                                                    <option value="Madang Suku I">Madang Suku I</option>
+                                                    <option value="Lainnya">Lainnya (Luar OKUT)</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="text-4xs font-bold text-slate-400 uppercase block mb-1">Alamat Lengkap</label>
+                                                <textarea x-model="shippingForm.address" placeholder="Tuliskan jalan, RT/RW, nomor rumah/toko secara detail..." class="w-full bg-slate-50 border rounded-xl py-2 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-grosir-teal h-20 resize-none"></textarea>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Grand Total -->
+                                    <div class="bg-grosir-lightTeal p-4 rounded-2xl border border-grosir-teal/20 space-y-1">
+                                        <span class="text-4xs text-grosir-teal font-bold uppercase tracking-widest block">GRAND TOTAL INVOICE</span>
+                                        <h3 class="text-2xl font-black text-grosir-teal" x-text="formatRupiah(getCartTotal())"></h3>
+                                        <span class="text-4xs text-slate-400 block">*Invoice otomatis diterbitkan sesaat setelah menekan tombol di bawah</span>
+                                    </div>
+
+                                    <!-- Checkout Button (Internal Pemesanan) -->
+                                    <button @click="processInternalCheckout()" class="w-full bg-grosir-teal hover:bg-emerald-600 text-white font-black py-3 rounded-2xl transition shadow-lg flex items-center justify-center gap-2">
+                                        <i class="fa-solid fa-file-invoice-dollar text-lg"></i> Proses Pemesanan & Buat Invoice
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 5. HALAMAN RIWAYAT PESANAN (MENDUKUNG PEMBAYARAN SIMULASI & INVOICE DETAIL) -->
+                    <div x-show="view === 'history'" class="space-y-6" x-transition>
+                        <h2 class="text-2xl font-black text-grosir-navy flex items-center">
+                            <i class="fa-solid fa-clock-rotate-left mr-3 text-grosir-teal"></i> Riwayat & Status Invoice Pesanan
+                        </h2>
+
+                        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 space-y-6">
+                            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
+                                <div>
+                                    <p class="text-sm text-slate-500">Kelola invoice transaksi Anda di sini. Anda dapat mencetak struk belanja atau melakukan simulasi pelunasan langsung.</p>
+                                </div>
+                                <button @click="clearHistory()" class="text-xs text-rose-500 font-bold hover:underline" x-show="orderHistory.length > 0">
+                                    <i class="fa-regular fa-trash-can mr-1"></i> Bersihkan Riwayat
+                                </button>
+                            </div>
+
+                            <template x-if="orderHistory.length === 0">
+                                <div class="text-center py-12 text-slate-400">
+                                    <i class="fa-solid fa-file-invoice-dollar text-6xl mb-4 text-slate-200"></i>
+                                    <h3 class="font-black text-lg text-grosir-navy">Belum Ada Riwayat</h3>
+                                    <p class="text-sm">Anda belum memiliki transaksi pengajuan pesanan grosir.</p>
+                                </div>
+                            </template>
+
+                            <div class="space-y-6" x-show="orderHistory.length > 0">
+                                <template x-for="order in orderHistory" :key="order.id">
+                                    <div class="border rounded-2xl p-4 md:p-6 space-y-4 hover:shadow-md transition bg-white"
+                                         :class="order.status === 'Lunas - Diproses' || order.status === 'Dikirim' || order.status === 'Selesai' ? 'border-emerald-200 bg-emerald-50/10' : 'border-amber-200 bg-amber-50/5'">
+                                        
+                                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 border-b pb-3">
+                                            <div>
+                                                <span class="text-2xs text-slate-400 block font-bold" x-text="'ID Invoice: #' + order.id"></span>
+                                                <h4 class="font-extrabold text-sm text-grosir-navy" x-text="order.outlet"></h4>
+                                            </div>
+                                            <div class="flex items-center space-x-3 text-xs">
+                                                <span class="font-bold px-2.5 py-1 rounded-full text-3xs uppercase"
+                                                      :class="{
+                                                          'bg-amber-100 text-amber-800 border border-amber-300': order.status === 'Belum Bayar',
+                                                          'bg-blue-100 text-blue-800 border border-blue-300': order.status === 'Menunggu Konfirmasi',
+                                                          'bg-emerald-100 text-emerald-800 border border-emerald-300': order.status === 'Lunas - Diproses',
+                                                          'bg-purple-100 text-purple-800 border border-purple-300': order.status === 'Dikirim',
+                                                          'bg-slate-100 text-slate-800 border border-slate-300': order.status === 'Selesai'
+                                                      }"
+                                                      x-text="order.status"></span>
+                                                <span class="text-slate-400 font-semibold" x-text="order.date"></span>
+                                            </div>
+                                        </div>
+
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                            <div class="space-y-1 text-slate-600">
+                                                <p><i class="fa-solid fa-location-dot text-grosir-teal mr-1"></i> Alamat: <strong class="text-slate-700" x-text="order.address + ', Kec. ' + order.district"></strong></p>
+                                                <p><i class="fa-solid fa-phone text-grosir-teal mr-1"></i> HP/WA Kontak: <strong class="text-slate-700" x-text="order.phone"></strong></p>
+                                                <p><i class="fa-solid fa-weight-hanging text-grosir-teal mr-1"></i> Berat Kargo: <strong class="text-slate-700" x-text="order.weight + ' Kg'"></strong></p>
+                                            </div>
+                                            
+                                            <!-- Rekening Toko / Bank Tujuan Detail -->
+                                            <div class="bg-white p-4 rounded-xl border border-slate-100 space-y-2">
+                                                <span class="text-4xs text-slate-400 font-extrabold block uppercase tracking-wider">REKENING PEMBAYARAN RESMI TOKO</span>
+                                                <div class="space-y-1 text-xs">
+                                                    <div class="flex items-center justify-between">
+                                                        <span class="text-slate-500">Bank Sumsel Babel:</span>
+                                                        <strong class="text-grosir-navy">115-09-002026</strong>
+                                                    </div>
+                                                    <div class="flex items-center justify-between border-t border-slate-50 pt-1">
+                                                        <span class="text-slate-500">Bank Mandiri:</span>
+                                                        <strong class="text-grosir-navy">112-00-139A8C</strong>
+                                                    </div>
+                                                    <div class="flex items-center justify-between border-t border-slate-50 pt-1">
+                                                        <span class="text-slate-400 text-3xs font-medium">A.N:</span>
+                                                        <strong class="text-slate-600 text-3xs font-extrabold uppercase">CV. GROSIR OKUT UTAMA</strong>
+                                                    </div>
+                                                    <div class="flex justify-between text-xs text-slate-700 border-t pt-1.5 font-bold">
+                                                        <span>Total Tagihan:</span>
+                                                        <span class="text-grosir-teal text-sm font-black" x-text="formatRupiah(order.total)"></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- List Item Rincian -->
+                                        <div class="bg-slate-50 p-4 rounded-xl space-y-2 text-xs">
+                                            <span class="text-4xs font-bold text-slate-400 block uppercase">Detail Item Terbeli:</span>
+                                            <template x-for="item in order.items" :key="item.name">
+                                                <div class="flex justify-between border-b border-dashed border-slate-200 pb-1.5 last:border-0 last:pb-0">
+                                                    <span x-text="item.name + ' (' + item.qty + ' ' + item.unit + ')'"></span>
+                                                    <span class="font-bold text-slate-700" x-text="formatRupiah(item.price * item.qty)"></span>
+                                                </div>
+                                            </template>
+                                        </div>
+
+                                        <!-- Interactive Actions (Bayar Simulasi & Lihat Struk) -->
+                                        <div class="flex justify-between items-center pt-2 border-t border-slate-100 flex-wrap gap-2">
+                                            <!-- Tombol Lihat Struk Belanja -->
+                                            <button @click="viewReceipt(order)" class="bg-slate-100 hover:bg-slate-200 text-grosir-navy font-bold text-xs px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 border border-slate-200">
+                                                <i class="fa-solid fa-receipt text-grosir-teal"></i> Lihat / Cetak Struk
+                                            </button>
+
+                                            <div class="flex gap-2">
+                                                <template x-if="order.status === 'Belum Bayar'">
+                                                    <button @click="simulatePayment(order.id)" class="bg-grosir-teal hover:bg-emerald-600 text-white font-extrabold text-xs px-4 py-2 rounded-xl transition shadow flex items-center gap-1.5">
+                                                        <i class="fa-solid fa-wallet"></i> Simulasikan Bayar Sekarang
+                                                    </button>
+                                                </template>
+                                                <template x-if="order.status === 'Menunggu Konfirmasi'">
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="text-xs text-slate-500 italic"><i class="fa-solid fa-circle-notch fa-spin text-grosir-teal mr-1"></i> Menunggu verifikasi admin (3 detik)...</span>
+                                                    </div>
+                                                </template>
+                                                <template x-if="order.status === 'Lunas - Diproses'">
+                                                    <span class="text-xs text-emerald-600 font-bold flex items-center gap-1"><i class="fa-solid fa-circle-check"></i> Pembayaran Terverifikasi & Logistik Sedang Dikemas</span>
+                                                </template>
+                                                <template x-if="order.status === 'Dikirim'">
+                                                    <div class="flex items-center justify-between w-full">
+                                                        <span class="text-xs text-purple-600 font-bold flex items-center gap-1"><i class="fa-solid fa-truck-fast"></i> Pesanan sedang di perjalanan kargo!</span>
+                                                        <button @click="updateOrderStatus(order.id, 'Selesai')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition shadow ml-2">
+                                                            Konfirmasi Selesai
+                                                        </button>
+                                                    </div>
+                                                </template>
+                                                <template x-if="order.status === 'Selesai'">
+                                                    <span class="text-xs text-slate-500 font-bold flex items-center gap-1"><i class="fa-solid fa-box-open"></i> Transaksi Selesai & Sukses</span>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 6. HALAMAN TENTANG KAMI -->
+                    <div x-show="view === 'about'" class="space-y-8" x-transition>
+                        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                            <div class="bg-gradient-to-r from-grosir-navy to-grosir-teal p-8 md:p-12 text-white text-center space-y-4">
+                                <h2 class="text-3xl font-black">Mengenal Grosir Okut</h2>
+                                <p class="text-slate-200 text-sm max-w-xl mx-auto">Kami adalah pionir penyedia platform pasokan B2B terpadu di kawasan Ogan Komering Ulu Timur, menghubungkan pabrikan nasional langsung dengan para pemilik usaha retail mikro.</p>
+                            </div>
+                            <div class="p-8 md:p-12 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                                <div class="space-y-4">
+                                    <h3 class="text-xl font-black text-grosir-navy">Visi & Misi Kami</h3>
+                                    <p class="text-slate-600 text-sm leading-relaxed">Menjadi lokomotif distribusi logistik bahan pokok terkemuka yang paling andal, murah, serta efisien bagi para wirausaha mandiri di wilayah OKU Timur dan sekitarnya tanpa rantai perantara berbelit.</p>
+                                </div>
+                                <div class="bg-slate-50 p-6 rounded-3xl border space-y-6">
+                                    <h3 class="text-lg font-black text-grosir-navy flex items-center"><i class="fa-solid fa-calculator text-grosir-teal mr-2"></i> Simulasi Estimasi Kargo</h3>
+                                    <p class="text-2xs text-slate-400">Gunakan alat hitung cepat ini untuk memperkirakan kisaran biaya pengiriman kargo Anda.</p>
+                                    
+                                    <div class="space-y-3">
+                                        <div>
+                                            <label class="text-4xs font-bold text-slate-400 uppercase block mb-1">Berat Paket (Kg)</label>
+                                            <input type="number" x-model.number="calcWeight" class="w-full bg-white border rounded-xl py-2 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-grosir-teal">
+                                        </div>
+                                        <div>
+                                            <label class="text-4xs font-bold text-slate-400 uppercase block mb-1">Pilih Zona Kecamatan</label>
+                                            <select x-model.number="calcZone" class="w-full bg-white border rounded-xl py-2 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-grosir-teal">
+                                                <option value="1500">Zona Martapura (Rp 1.500/Kg)</option>
+                                                <option value="2000">Zona Belitang (Rp 2.000/Kg)</option>
+                                                <option value="2500">Zona Buay Madang (Rp 2.500/Kg)</option>
+                                                <option value="3500">Zona Luar OKUT (Rp 3.500/Kg)</option>
+                                            </select>
+                                        </div>
+                                        <div class="bg-grosir-lightTeal p-4 rounded-xl border border-grosir-teal/10 flex justify-between items-center">
+                                            <span class="text-xs font-bold text-slate-600">Estimasi Ongkir:</span>
+                                            <strong class="text-base text-grosir-teal" x-text="formatRupiah(calcWeight * calcZone)"></strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 7. HALAMAN KONTAK -->
+                    <div x-show="view === 'contact'" class="space-y-6" x-transition>
+                        <h2 class="text-2xl font-black text-grosir-navy flex items-center">
+                            <i class="fa-solid fa-headset mr-3 text-grosir-teal"></i> Pusat Layanan Mitra Grosir Okut
+                        </h2>
+
+                        <div class="grid grid-cols-1 md:grid-cols-12 gap-8">
+                            <!-- Contact Info Card -->
+                            <div class="md:col-span-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-6 h-fit">
+                                <h3 class="font-black text-grosir-navy border-b pb-3">Informasi Kontak</h3>
+                                <div class="space-y-4 text-xs">
+                                    <div class="flex items-start space-x-3">
+                                        <div class="bg-grosir-lightTeal p-2.5 rounded-xl text-grosir-teal">
+                                            <i class="fa-solid fa-map-location-dot"></i>
+                                        </div>
+                                        <div>
+                                            <span class="text-slate-400 block font-bold text-4xs uppercase">Gudang Utama</span>
+                                            <p class="text-slate-600 leading-relaxed font-semibold">Jl. Merdeka No. 45, Martapura, Ogan Komering Ulu Timur, Sumatera Selatan</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-start space-x-3">
+                                        <div class="bg-grosir-lightTeal p-2.5 rounded-xl text-grosir-teal">
+                                            <i class="fa-solid fa-envelope"></i>
+                                        </div>
+                                        <div>
+                                            <span class="text-slate-400 block font-bold text-4xs uppercase">Email Distribusi</span>
+                                            <p class="text-slate-600 leading-relaxed font-semibold">kontak@grosirokut.com</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-start space-x-3">
+                                        <div class="bg-grosir-lightTeal p-2.5 rounded-xl text-grosir-teal">
+                                            <i class="fa-solid fa-phone"></i>
+                                        </div>
+                                        <div>
+                                            <span class="text-slate-400 block font-bold text-4xs uppercase">Layanan Kantor</span>
+                                            <p class="text-slate-600 leading-relaxed font-semibold">0812-7100-2026</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Contact Message Form -->
+                            <div class="md:col-span-8 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+                                <h3 class="font-black text-grosir-navy border-b pb-3">Kirim Pesan Internal ke Manajemen</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="text-4xs font-bold text-slate-400 uppercase block mb-1">Nama Pengirim</label>
+                                        <input type="text" x-model="contactForm.name" placeholder="Nama Anda atau Outlet" class="w-full bg-slate-50 border rounded-xl py-2 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-grosir-teal">
+                                    </div>
+                                    <div>
+                                        <label class="text-4xs font-bold text-slate-400 uppercase block mb-1">Nomor WhatsApp / HP</label>
+                                        <input type="text" x-model="contactForm.phone" placeholder="Contoh: 0812xxxxxxxx" class="w-full bg-slate-50 border rounded-xl py-2 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-grosir-teal">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="text-4xs font-bold text-slate-400 uppercase block mb-1">Isi Pesan / Pertanyaan Kemitraan</label>
+                                    <textarea x-model="contactForm.message" placeholder="Tulis pesan lengkap terkait penawaran harga, kerja sama logistik, atau komplain..." class="w-full bg-slate-50 border rounded-xl py-2.5 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-grosir-teal h-32 resize-none"></textarea>
+                                </div>
+                                <button @click="submitInternalContact()" class="bg-grosir-teal hover:bg-emerald-600 text-white font-bold py-2.5 px-6 rounded-xl transition shadow text-xs flex items-center gap-1.5">
+                                    <i class="fa-solid fa-paper-plane"></i> Kirim Masukan Ke Admin
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+
+            <!-- ================= SISI ADMIN PANEL ================= -->
+            <template x-if="adminMode">
+                <div class="space-y-6" x-transition>
+                    
+                    <!-- SUB-VIEW 1: ADMIN DASHBOARD -->
+                    <div x-show="adminActiveTab === 'dashboard'" class="space-y-6">
+                        <h2 class="text-2xl font-black text-grosir-navy flex items-center">
+                            <i class="fa-solid fa-chart-pie mr-3 text-grosir-teal"></i> Ringkasan Dasbor & Analitik Gudang
+                        </h2>
+
+                        <!-- Analisis Kartu Counter -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center space-x-4">
+                                <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl text-xl">
+                                    <i class="fa-solid fa-sack-dollar"></i>
+                                </div>
+                                <div>
+                                    <span class="text-4xs font-bold uppercase tracking-wider text-slate-400 block">Total Pendapatan</span>
+                                    <strong class="text-lg font-black text-grosir-navy" x-text="formatRupiah(getAdminRevenue())"></strong>
+                                </div>
+                            </div>
+
+                            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center space-x-4">
+                                <div class="p-3 bg-grosir-lightTeal text-grosir-teal rounded-xl text-xl">
+                                    <i class="fa-solid fa-file-invoice-dollar"></i>
+                                </div>
+                                <div>
+                                    <span class="text-4xs font-bold uppercase tracking-wider text-slate-400 block">Total Invoice Pesanan</span>
+                                    <strong class="text-lg font-black text-grosir-navy" x-text="orderHistory.length + ' Pesanan'"></strong>
+                                </div>
+                            </div>
+
+                            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center space-x-4">
+                                <div class="p-3 bg-amber-50 text-amber-600 rounded-xl text-xl">
+                                    <i class="fa-solid fa-triangle-exclamation"></i>
+                                </div>
+                                <div>
+                                    <span class="text-4xs font-bold uppercase tracking-wider text-slate-400 block">Stok Menipis (&lt; 200)</span>
+                                    <strong class="text-lg font-black text-grosir-navy" x-text="products.filter(p => p.stock < 200).length + ' Produk'"></strong>
+                                </div>
+                            </div>
+
+                            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center space-x-4">
+                                <div class="p-3 bg-rose-50 text-rose-600 rounded-xl text-xl">
+                                    <i class="fa-solid fa-envelope-open-text"></i>
+                                </div>
+                                <div>
+                                    <span class="text-4xs font-bold uppercase tracking-wider text-slate-400 block">Pesan Masuk Masukan</span>
+                                    <strong class="text-lg font-black text-grosir-navy" x-text="messages.length + ' Pesan'"></strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Low Stock Alerts -->
+                        <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+                            <h3 class="font-black text-grosir-navy flex items-center"><i class="fa-solid fa-triangle-exclamation text-amber-500 mr-2"></i> Alarm Pengingat Stok Gudang Menipis</h3>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-xs text-left text-slate-500">
+                                    <thead class="text-4xs font-bold uppercase tracking-wider bg-slate-50 text-slate-700">
+                                        <tr>
+                                            <th class="p-3">Nama Produk</th>
+                                            <th class="p-3">Kategori</th>
+                                            <th class="p-3">Stok Tersisa</th>
+                                            <th class="p-3 text-right">Aksi Tambah Stok</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="p in products" :key="p.id">
+                                            <tr class="border-b" x-show="p.stock < 200">
+                                                <td class="p-3 font-semibold text-grosir-navy" x-text="p.name"></td>
+                                                <td class="p-3" x-text="p.category"></td>
+                                                <td class="p-3 font-bold text-rose-600" x-text="p.stock + ' ' + p.unit"></td>
+                                                <td class="p-3 text-right">
+                                                    <button @click="refillStock(p.id)" class="bg-grosir-navy hover:bg-grosir-teal text-white font-bold px-2 py-1 rounded text-[10px] transition">
+                                                        Refill (+100)
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SUB-VIEW 2: KELOLA INVOICE -->
+                    <div x-show="adminActiveTab === 'orders'" class="space-y-4">
+                        <h2 class="text-2xl font-black text-grosir-navy flex items-center">
+                            <i class="fa-solid fa-receipt mr-3 text-grosir-teal"></i> Manajemen & Validasi Invoice Pesanan
+                        </h2>
+
+                        <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+                            <template x-if="orderHistory.length === 0">
+                                <div class="text-center py-12 text-slate-400">
+                                    <i class="fa-solid fa-box-open text-6xl mb-4 text-slate-200"></i>
+                                    <h3 class="font-black text-lg text-grosir-navy">Belum Ada Transaksi Masuk</h3>
+                                    <p class="text-sm">Invoice pelanggan akan terdata otomatis di halaman ini setelah checkout.</p>
+                                </div>
+                            </template>
+
+                            <div class="space-y-4" x-show="orderHistory.length > 0">
+                                <template x-for="order in orderHistory" :key="order.id">
+                                    <div class="border rounded-2xl p-4 bg-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                        <div class="space-y-1 text-xs">
+                                            <div class="flex items-center space-x-2">
+                                                <strong class="text-grosir-navy text-sm" x-text="order.outlet"></strong>
+                                                <span class="text-slate-400" x-text="'(#' + order.id + ')'"></span>
+                                            </div>
+                                            <p class="text-slate-500">HP: <strong class="text-slate-700" x-text="order.phone"></strong> | Kecamatan: <strong class="text-slate-700" x-text="order.district"></strong></p>
+                                            <p class="text-slate-500">Alamat: <strong class="text-slate-700" x-text="order.address"></strong></p>
+                                            <p class="text-slate-500">Total Tagihan: <strong class="text-grosir-teal font-extrabold" x-text="formatRupiah(order.total)"></strong></p>
+                                            <p class="text-slate-500">Tanggal Transaksi: <span x-text="order.date"></span></p>
+                                            
+                                            <!-- Detail Item -->
+                                            <div class="mt-2 text-[11px] bg-white p-2 rounded-lg border max-w-md">
+                                                <span class="font-bold text-slate-400 block uppercase tracking-wider text-[9px]">Daftar Item:</span>
+                                                <template x-for="item in order.items" :key="item.name">
+                                                    <div class="flex justify-between border-b last:border-0 py-0.5">
+                                                        <span x-text="item.name + ' x ' + item.qty + ' ' + item.unit"></span>
+                                                        <span class="font-semibold text-slate-600" x-text="formatRupiah(item.price * item.qty)"></span>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+
+                                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+                                            <!-- Tombol Lihat Struk Belanja Kasir -->
+                                            <button @click="viewReceipt(order)" class="bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold p-2 rounded-lg text-xs transition flex items-center justify-center gap-1">
+                                                <i class="fa-solid fa-print text-grosir-teal"></i> Struk
+                                            </button>
+                                            
+                                            <div class="space-y-1">
+                                                <label class="text-[10px] font-bold text-slate-400 uppercase block">Ubah Status</label>
+                                                <select :value="order.status" @change="updateOrderStatus(order.id, $event.target.value)" class="bg-white border text-xs font-bold py-1.5 px-3 rounded-lg focus:ring-1 focus:ring-grosir-teal">
+                                                    <option value="Belum Bayar">Belum Bayar</option>
+                                                    <option value="Menunggu Konfirmasi">Menunggu Konfirmasi</option>
+                                                    <option value="Lunas - Diproses">Lunas - Diproses</option>
+                                                    <option value="Dikirim">Dikirim</option>
+                                                    <option value="Selesai">Selesai</option>
+                                                </select>
+                                            </div>
+                                            <button @click="deleteOrder(order.id)" class="self-end bg-rose-500 hover:bg-rose-600 text-white p-2 rounded-lg text-xs transition h-fit">
+                                                <i class="fa-regular fa-trash-can"></i> Hapus
+                                            </button>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SUB-VIEW 3: KELOLA KATALOG -->
+                    <div x-show="adminActiveTab === 'products'" class="space-y-4">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <h2 class="text-2xl font-black text-grosir-navy flex items-center">
+                                <i class="fa-solid fa-cubes mr-3 text-grosir-teal"></i> Kelola Item Persediaan Katalog
+                            </h2>
+                            <button @click="openAddProductModal()" class="bg-grosir-teal hover:bg-emerald-600 text-white font-black text-xs px-4 py-2.5 rounded-xl transition shadow flex items-center gap-2">
+                                <i class="fa-solid fa-plus"></i> Tambah Item Produk Baru
+                            </button>
+                        </div>
+
+                        <!-- Products Table -->
+                        <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-xs text-left text-slate-500">
+                                    <thead class="text-4xs font-bold uppercase tracking-wider bg-slate-50 text-slate-700">
+                                        <tr>
+                                            <th class="p-3">Foto</th>
+                                            <th class="p-3">Nama Produk</th>
+                                            <th class="p-3">Kategori</th>
+                                            <th class="p-3">Harga Grosir</th>
+                                            <th class="p-3">Minimal MOQ</th>
+                                            <th class="p-3">Stok Tersedia</th>
+                                            <th class="p-3 text-right">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y">
+                                        <template x-for="p in products" :key="p.id">
+                                            <tr>
+                                                <td class="p-3">
+                                                    <img :src="p.image" class="w-10 h-10 object-cover rounded-lg border bg-slate-100" onerror="this.src='https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=80'">
+                                                </td>
+                                                <td class="p-3 font-semibold text-grosir-navy" x-text="p.name"></td>
+                                                <td class="p-3" x-text="p.category"></td>
+                                                <td class="p-3 font-extrabold text-grosir-teal" x-text="formatRupiah(p.price)"></td>
+                                                <td class="p-3 font-medium text-slate-700" x-text="p.moq + ' ' + p.unit"></td>
+                                                <td class="p-3 font-bold" :class="p.stock < 200 ? 'text-rose-500' : 'text-emerald-600'" x-text="p.stock + ' ' + p.unit"></td>
+                                                <td class="p-3 text-right space-x-1 whitespace-nowrap">
+                                                    <button @click="openEditProductModal(p)" class="bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold p-1.5 rounded-lg transition">
+                                                        <i class="fa-solid fa-pen"></i> Edit
+                                                    </button>
+                                                    <button @click="deleteProduct(p.id)" class="bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold p-1.5 rounded-lg transition">
+                                                        <i class="fa-solid fa-trash-can"></i> Hapus
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SUB-VIEW 4: PESAN MASUK -->
+                    <div x-show="adminActiveTab === 'messages'" class="space-y-4">
+                        <h2 class="text-2xl font-black text-grosir-navy flex items-center">
+                            <i class="fa-solid fa-envelope-open-text mr-3 text-grosir-teal"></i> Pesan Masuk Pengunjung & Pelanggan
+                        </h2>
+
+                        <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+                            <template x-if="messages.length === 0">
+                                <div class="text-center py-12 text-slate-400">
+                                    <i class="fa-regular fa-envelope text-6xl mb-4 text-slate-200"></i>
+                                    <h3 class="font-black text-lg text-grosir-navy">Kotak Masuk Kosong</h3>
+                                    <p class="text-sm">Tidak ada pesan atau masukan baru yang diterima saat ini.</p>
+                                </div>
+                            </template>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4" x-show="messages.length > 0">
+                                <template x-for="(msg, idx) in messages" :key="idx">
+                                    <div class="bg-slate-50 rounded-2xl p-4 border relative space-y-2">
+                                        <button @click="deleteMessage(idx)" class="absolute top-4 right-4 text-rose-500 hover:text-rose-700 transition">
+                                            <i class="fa-solid fa-trash-can"></i>
+                                        </button>
+                                        <div class="space-y-1">
+                                            <div class="flex items-center space-x-2 text-xs text-slate-400">
+                                                <i class="fa-solid fa-clock"></i>
+                                                <span x-text="msg.time"></span>
+                                            </div>
+                                            <h4 class="font-extrabold text-sm text-grosir-navy" x-text="msg.name"></h4>
+                                            <p class="text-3xs font-bold text-grosir-teal uppercase" x-text="'HP/WA: ' + msg.phone"></p>
+                                        </div>
+                                        <p class="text-xs text-slate-600 bg-white p-3 rounded-xl border leading-relaxed italic" x-text="'&ldquo;' + msg.message + '&rdquo;'"></p>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </template>
+
+            <!-- Product Modal (Add / Edit) -->
+            <div x-show="showProductModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 overflow-y-auto" x-transition>
+                <div class="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 space-y-5 my-8">
+                    <div class="flex justify-between items-center border-b pb-3">
+                        <h3 class="font-black text-lg text-grosir-navy" x-text="productModalMode === 'add' ? 'Tambah Item Produk Baru' : 'Edit Detail Produk'"></h3>
+                        <button @click="showProductModal = false" class="text-slate-400 hover:text-slate-600 text-lg">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                        <div class="space-y-1">
+                            <label class="font-bold text-slate-500">Nama Produk</label>
+                            <input type="text" x-model="productForm.name" placeholder="Contoh: Gula Pasir Premium" class="w-full bg-slate-50 border rounded-xl py-2 px-3 focus:outline-none focus:ring-1 focus:ring-grosir-teal">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="font-bold text-slate-500">Kategori</label>
+                            <select x-model="productForm.category" class="w-full bg-slate-50 border rounded-xl py-2 px-3 focus:outline-none focus:ring-1 focus:ring-grosir-teal">
+                                <option value="Beras & Gandum">Beras & Gandum</option>
+                                <option value="Minyak & Gula">Minyak & Gula</option>
+                                <option value="Mi Instan">Mi Instan</option>
+                                <option value="Bumbu Dapur">Bumbu Dapur</option>
+                                <option value="Sabun & Detergen">Sabun & Detergen</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="font-bold text-slate-500">Harga Satuan (Rp)</label>
+                            <input type="number" x-model.number="productForm.price" placeholder="Contoh: 15000" class="w-full bg-slate-50 border rounded-xl py-2 px-3 focus:outline-none focus:ring-1 focus:ring-grosir-teal">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="font-bold text-slate-500">Kuantitas Minimum (MOQ)</label>
+                            <input type="number" x-model.number="productForm.moq" placeholder="Contoh: 5" class="w-full bg-slate-50 border rounded-xl py-2 px-3 focus:outline-none focus:ring-1 focus:ring-grosir-teal">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="font-bold text-slate-500">Satuan Pembelian</label>
+                            <input type="text" x-model="productForm.unit" placeholder="Contoh: Sak, Pcs, Karton" class="w-full bg-slate-50 border rounded-xl py-2 px-3 focus:outline-none focus:ring-1 focus:ring-grosir-teal">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="font-bold text-slate-500">Stok Gudang Utama</label>
+                            <input type="number" x-model.number="productForm.stock" placeholder="Contoh: 500" class="w-full bg-slate-50 border rounded-xl py-2 px-3 focus:outline-none focus:ring-1 focus:ring-grosir-teal">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="font-bold text-slate-500">Berat Per Satuan (Gram)</label>
+                            <input type="number" x-model.number="productForm.weightGram" placeholder="Contoh: 1000" class="w-full bg-slate-50 border rounded-xl py-2 px-3 focus:outline-none focus:ring-1 focus:ring-grosir-teal">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="font-bold text-slate-500">Bentuk Satuan Kemas</label>
+                            <input type="text" x-model="productForm.package" placeholder="Contoh: Sak 10 Kg, Pack 1 Kg" class="w-full bg-slate-50 border rounded-xl py-2 px-3 focus:outline-none focus:ring-1 focus:ring-grosir-teal">
+                        </div>
+                        <div class="space-y-1 sm:col-span-2">
+                            <label class="font-bold text-slate-500">Link Foto Gambar Produk (URL)</label>
+                            <input type="text" x-model="productForm.image" placeholder="Contoh: https://images.unsplash.com/..." class="w-full bg-slate-50 border rounded-xl py-2 px-3 focus:outline-none focus:ring-1 focus:ring-grosir-teal">
+                        </div>
+                        <div class="space-y-1 sm:col-span-2">
+                            <label class="font-bold text-slate-500">Deskripsi Distribusi</label>
+                            <textarea x-model="productForm.description" placeholder="Deskripsikan spesifikasi detail produk atau syarat pembelian di sini..." class="w-full bg-slate-50 border rounded-xl py-2 px-3 focus:outline-none focus:ring-1 focus:ring-grosir-teal h-24 resize-none"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-2 border-t pt-3">
+                        <button @click="saveProduct()" class="bg-grosir-teal hover:bg-emerald-600 text-white font-bold py-2 px-6 rounded-xl text-xs transition">
+                            Simpan Perubahan
+                        </button>
+                        <button @click="showProductModal = false" class="bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold py-2 px-4 rounded-xl text-xs transition">
+                            Batal
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- FOOTER (LOGGED IN) -->
+        <footer class="bg-grosir-navy text-white/70 border-t border-white/10 mt-12 py-8 text-xs no-print">
+            <div class="container mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                <div class="space-y-4">
+                    <div class="bg-grosir-teal p-2 rounded-xl text-white font-black text-xl tracking-wider inline-flex items-center shadow-md">
+                        <i class="fa-solid fa-boxes-packing mr-2 text-grosir-gold"></i> GROSIR<span class="text-grosir-gold">OKUT</span>
+                    </div>
+                    <p class="leading-relaxed">Solusi cerdas kulakan sembako tangan pertama. Efisien, transparan, terjangkau, dan andal untuk kemajuan UKM OKU Timur.</p>
+                </div>
+                <div class="space-y-3">
+                    <h4 class="font-extrabold text-white text-sm uppercase tracking-wider">Halaman Utama</h4>
+                    <ul class="space-y-2">
+                        <li><button @click="setView('home')" class="hover:text-grosir-gold transition text-left">Beranda</button></li>
+                        <li><button @click="setView('catalog')" class="hover:text-grosir-gold transition text-left">Katalog Produk</button></li>
+                        <li><button @click="setView('about')" class="hover:text-grosir-gold transition text-left">Tentang Kami</button></li>
+                        <li><button @click="setView('contact')" class="hover:text-grosir-gold transition text-left">Hubungi Layanan CS</button></li>
+                    </ul>
+                </div>
+                <div class="space-y-3">
+                    <h4 class="font-extrabold text-white text-sm uppercase tracking-wider">Pola Kemitraan</h4>
+                    <p class="leading-relaxed">Kami melayani pengiriman terjadwal harian ke berbagai kecamatan. Hubungi kami untuk harga khusus pengisian toko kelontong baru.</p>
+                    <p class="text-grosir-gold font-bold"><i class="fa-solid fa-phone mr-1"></i> Layanan CS: 0812-7100-2026</p>
+                </div>
+            </div>
+            <div class="border-t border-white/10 pt-4 text-center">
+                <div class="container mx-auto px-4">
+                    <p>&copy; 2026 <strong class="text-white">Grosir Okut</strong>. Hak Cipta Dilindungi Undang-Undang.</p>
+                </div>
+            </div>
+        </footer>
+
+    </div>
+
+    <script>
+        function grosirApp() {
+            return {
+                // Multi-Gateway Login states
+                isLoggedIn: false,
+                loginRole: 'pelanggan', // 'pelanggan' or 'admin'
+                loginForm: {
+                    outletName: '',
+                    phone: '',
+                    pin: ''
+                },
+
+                view: 'home',
+                searchQuery: '',
+                selectedCat: 'Semua',
+                sortBy: 'default',
+                selectedProduct: null,
+                detailQty: 1,
+
+                // Admin States
+                adminMode: false,
+                adminActiveTab: 'dashboard',
+                showProductModal: false,
+                productModalMode: 'add', // 'add' or 'edit'
+                selectedProductId: null,
+
+                // Struk Modal States
+                showReceiptModal: false,
+                receiptOrder: null,
+
+                // State Form
+                calcWeight: 10,
+                calcZone: 1500,
+                shippingForm: {
+                    name: '',
+                    phone: '',
+                    district: '',
+                    address: ''
+                },
+                contactForm: {
+                    name: '',
+                    phone: '',
+                    message: ''
+                },
+                productForm: {
+                    name: '',
+                    category: 'Beras & Gandum',
+                    price: 0,
+                    moq: 1,
+                    unit: 'Pcs',
+                    stock: 500,
+                    weightGram: 1000,
+                    package: 'Pouch 2L',
+                    image: '',
+                    description: ''
+                },
+
+                // Notifications System
+                notifications: [],
+
+                // Local State data
+                cart: [],
+                orderHistory: [],
+                messages: [],
+
+                // Dummy data
+                categories: [
+                    { name: "Beras & Gandum", icon: "fa-solid fa-wheat-awn" },
+                    { name: "Minyak & Gula", icon: "fa-solid fa-bottle-droplet" },
+                    { name: "Mi Instan", icon: "fa-solid fa-bowl-food" },
+                    { name: "Bumbu Dapur", icon: "fa-solid fa-pepper-hot" },
+                    { name: "Sabun & Detergen", icon: "fa-solid fa-soap" }
+                ],
+
+                products: [],
+
+                defaultProducts: [
+                    {
+                        id: 1,
+                        name: "Beras Premium OKUT Cap Bunga Ramos 10 Kg",
+                        category: "Beras & Gandum",
+                        price: 135000,
+                        moq: 5,
+                        unit: "Sak",
+                        stock: 250,
+                        weightGram: 10000,
+                        package: "Sak 10 Kg",
+                        image: "https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=400&q=80",
+                        description: "Beras kualitas premium asli hasil bumi Ogan Komering Ulu Timur. Bulir padi putih bersih, pulen, wangi alami, tanpa pemutih kimia, serta sangat digemari oleh konsumen rumah tangga lokal."
+                    },
+                    {
+                        id: 2,
+                        name: "Minyak Goreng Sawit Higienis 2 Liter",
+                        category: "Minyak & Gula",
+                        price: 33500,
+                        moq: 12,
+                        unit: "Pcs",
+                        stock: 500,
+                        weightGram: 2000,
+                        package: "Pouch 2L",
+                        image: "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=400&q=80",
+                        description: "Minyak goreng kelapa sawit murni yang diproses melalui dua kali penyaringan sehingga menghasilkan minyak jernih tahan panas. Sangat cocok untuk menghemat modal memasak usaha katering."
+                    },
+                    {
+                        id: 3,
+                        name: "Gula Pasir Kristal Putih Premium 1 Kg",
+                        category: "Minyak & Gula",
+                        price: 16200,
+                        moq: 20,
+                        unit: "Pcs",
+                        stock: 800,
+                        weightGram: 1000,
+                        package: "Pack 1 Kg",
+                        image: "https://images.unsplash.com/photo-1581798459219-318e76aecc7b?auto=format&fit=crop&w=400&q=80",
+                        description: "Gula pasir tebu kristal putih bersih murni, diproduksi higienis dengan butiran konsisten. Ideal sebagai bahan utama manis untuk industri minuman, kue, maupun stok dapur harian."
+                    },
+                    {
+                        id: 4,
+                        name: "Karton Mi Instan Kaldu Ayam Populer (Isi 40)",
+                        category: "Mi Instan",
+                        price: 112000,
+                        moq: 3,
+                        unit: "Karton",
+                        stock: 120,
+                        weightGram: 3500,
+                        package: "Dus Karton",
+                        image: "https://images.unsplash.com/photo-1612966608967-302a4e402b12?auto=format&fit=crop&w=400&q=80",
+                        description: "Produk mi instan favorit sejuta umat rasa kaldu ayam gurih melimpah. Sangat cepat perputarannya (fast moving) di warung-warung kelontong tingkat RT."
+                    },
+                    {
+                        id: 5,
+                        name: "Detergen Bubuk Konsentrat Bersih Wangi 800g",
+                        category: "Sabun & Detergen",
+                        price: 18500,
+                        moq: 10,
+                        unit: "Pcs",
+                        stock: 350,
+                        weightGram: 800,
+                        package: "Plastik Sachet",
+                        image: "https://images.unsplash.com/photo-1607344645866-009c320c5ab8?auto=format&fit=crop&w=400&q=80",
+                        description: "Detergen bubuk formula konsentrat tinggi yang ampuh membersihkan noda membandel pada pakaian hanya sekali kucek. Wangi tahan lama berkat mikro kapsul parfum modern."
+                    },
+                    {
+                        id: 6,
+                        name: "Tepung Terigu Serbaguna Protein Sedang 1 Kg",
+                        category: "Beras & Gandum",
+                        price: 11800,
+                        moq: 15,
+                        unit: "Pcs",
+                        stock: 400,
+                        weightGram: 1000,
+                        package: "Pack 1 Kg",
+                        image: "https://images.unsplash.com/photo-1574316071802-0d684efa7bf5?auto=format&fit=crop&w=400&q=80",
+                        description: "Tepung terigu protein sedang berkualitas tinggi yang cocok untuk mengolah aneka kue, martabak manis, mie, gorengan renyah, maupun jajanan kuliner pasar."
+                    }
+                ],
+
+                initApp() {
+                    // Load Products from LocalStorage or Fallback
+                    const cachedProducts = localStorage.getItem('grosir_okut_products');
+                    if (cachedProducts) {
+                        this.products = JSON.parse(cachedProducts);
+                    } else {
+                        this.products = [...this.defaultProducts];
+                        localStorage.setItem('grosir_okut_products', JSON.stringify(this.products));
+                    }
+
+                    // Load Session State
+                    const cachedCart = localStorage.getItem('grosir_okut_cart');
+                    if (cachedCart) this.cart = JSON.parse(cachedCart);
+
+                    const cachedHistory = localStorage.getItem('grosir_okut_history');
+                    if (cachedHistory) this.orderHistory = JSON.parse(cachedHistory);
+
+                    const cachedMessages = localStorage.getItem('grosir_okut_messages');
+                    if (cachedMessages) this.messages = JSON.parse(cachedMessages);
+
+                    // Check Persistent Session
+                    const savedSession = localStorage.getItem('grosir_okut_session');
+                    if (savedSession) {
+                        const session = JSON.parse(savedSession);
+                        this.isLoggedIn = true;
+                        this.adminMode = session.adminMode;
+                        this.shippingForm.name = session.outletName;
+                        this.shippingForm.phone = session.phone;
+                        if (this.adminMode) this.adminActiveTab = 'dashboard';
+                    }
+                },
+
+                // Authentication Functions
+                loginAsPelanggan() {
+                    if (this.loginForm.outletName.trim() === '' || this.loginForm.phone.trim() === '') {
+                        this.addNotification('Nama outlet dan Nomor HP wajib diisi!', 'error');
+                        return;
+                    }
+                    this.isLoggedIn = true;
+                    this.adminMode = false;
+                    
+                    // Integrasikan nama outlet dan telp ke shipping data otomatis
+                    this.shippingForm.name = this.loginForm.outletName;
+                    this.shippingForm.phone = this.loginForm.phone;
+
+                    // Persist session
+                    localStorage.setItem('grosir_okut_session', JSON.stringify({
+                        adminMode: false,
+                        outletName: this.loginForm.outletName,
+                        phone: this.loginForm.phone
+                    }));
+
+                    this.addNotification(`Selamat Datang, ${this.loginForm.outletName}!`, 'success');
+                    this.setView('home');
+                },
+
+                loginAsAdmin() {
+                    if (this.loginForm.pin === '1234') {
+                        this.isLoggedIn = true;
+                        this.adminMode = true;
+                        this.adminActiveTab = 'dashboard';
+
+                        // Persist session
+                        localStorage.setItem('grosir_okut_session', JSON.stringify({
+                            adminMode: true,
+                            outletName: 'Admin Gudang',
+                            phone: '081271002026'
+                        }));
+
+                        this.addNotification('Otorisasi Berhasil! Selamat Datang Administrator Gudang.', 'success');
+                    } else {
+                        this.addNotification('PIN Otorisasi Gudang Salah!', 'error');
+                    }
+                },
+
+                logout() {
+                    this.isLoggedIn = false;
+                    this.adminMode = false;
+                    this.loginForm.outletName = '';
+                    this.loginForm.phone = '';
+                    this.loginForm.pin = '';
+                    localStorage.removeItem('grosir_okut_session');
+                    this.addNotification('Anda berhasil keluar dari sistem.', 'info');
+                },
+
+                // Navigation
+                setView(target) {
+                    this.view = target;
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                },
+
+                selectCategory(catName) {
+                    this.selectedCat = catName;
+                    this.setView('catalog');
+                },
+
+                resetFilters() {
+                    this.selectedCat = 'Semua';
+                    this.sortBy = 'default';
+                    this.searchQuery = '';
+                    this.addNotification('Filter produk berhasil dikembalikan semula.', 'success');
+                },
+
+                // Filters Logic
+                filteredProducts() {
+                    let temp = [...this.products];
+
+                    // Kategori
+                    if (this.selectedCat !== 'Semua') {
+                        temp = temp.filter(p => p.category === this.selectedCat);
+                    }
+
+                    // Pencarian
+                    if (this.searchQuery.trim() !== '') {
+                        const q = this.searchQuery.toLowerCase();
+                        temp = temp.filter(p => p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q));
+                    }
+
+                    // Pengurutan
+                    if (this.sortBy === 'price-asc') {
+                        temp.sort((a, b) => a.price - b.price);
+                    } else if (this.sortBy === 'price-desc') {
+                        temp.sort((a, b) => b.price - a.price);
+                    } else if (this.sortBy === 'moq-asc') {
+                        temp.sort((a, b) => a.moq - b.moq);
+                    }
+
+                    return temp;
+                },
+
+                // Detail View
+                showProductDetail(prod) {
+                    this.selectedProduct = prod;
+                    this.detailQty = prod.moq; // Set awal ke minimal MOQ
+                    this.setView('detail');
+                },
+
+                incrementDetailQty() {
+                    if (this.selectedProduct && this.detailQty < this.selectedProduct.stock) {
+                        this.detailQty++;
+                    } else {
+                        this.addNotification('Kuantitas pesanan melebihi batas stok tersedia!', 'warning');
+                    }
+                },
+
+                decrementDetailQty() {
+                    if (this.selectedProduct && this.detailQty > this.selectedProduct.moq) {
+                        this.detailQty--;
+                    } else {
+                        this.addNotification(`Kuantitas minimum order (MOQ) adalah ${this.selectedProduct.moq} ${this.selectedProduct.unit}.`, 'warning');
+                    }
+                },
+
+                // Cart Operations
+                addToCart(product, qty) {
+                    if (qty < product.moq) {
+                        this.addNotification(`Tidak dapat menambah ke keranjang. Minimal pembelian (MOQ) ${product.moq} ${product.unit}.`, 'error');
+                        return;
+                    }
+
+                    const existingItemIndex = this.cart.findIndex(item => item.product.id === product.id);
+                    if (existingItemIndex > -1) {
+                        this.cart[existingItemIndex].quantity = qty;
+                    } else {
+                        this.cart.push({
+                            product: product,
+                            quantity: qty
+                        });
+                    }
+
+                    this.saveCart();
+                    this.addNotification(`Berhasil memasukkan ${qty} ${product.unit} ${product.name} ke keranjang.`, 'success');
+                    this.setView('cart');
+                },
+
+                removeFromCart(productId) {
+                    this.cart = this.cart.filter(item => item.product.id !== productId);
+                    this.saveCart();
+                    this.addNotification('Barang berhasil dihapus dari daftar keranjang.', 'warning');
+                },
+
+                updateCartQty(productId, newQty) {
+                    const idx = this.cart.findIndex(item => item.product.id === productId);
+                    if (idx > -1) {
+                        const product = this.cart[idx].product;
+                        
+                        if (newQty < product.moq) {
+                            this.addNotification(`Kuantitas tidak boleh kurang dari MOQ: ${product.moq} ${product.unit}.`, 'warning');
+                            this.cart[idx].quantity = product.moq;
+                        } else if (newQty > product.stock) {
+                            this.addNotification(`Persediaan stok gudang kami terbatas hanya ${product.stock} ${product.unit}.`, 'warning');
+                            this.cart[idx].quantity = product.stock;
+                        } else {
+                            this.cart[idx].quantity = newQty;
+                        }
+                        this.saveCart();
+                    }
+                },
+
+                getCartItemCount() {
+                    return this.cart.reduce((total, item) => total + item.quantity, 0);
+                },
+
+                getCartTotal() {
+                    return this.cart.reduce((total, item) => total + (item.product.price * item.quantity), 0);
+                },
+
+                getCartTotalWeight() {
+                    const totalGrams = this.cart.reduce((total, item) => total + (item.product.weightGram * item.quantity), 0);
+                    return (totalGrams / 1000).toFixed(1);
+                },
+
+                saveCart() {
+                    localStorage.setItem('grosir_okut_cart', JSON.stringify(this.cart));
+                },
+
+                // PEMESANAN INTERNAL
+                processInternalCheckout() {
+                    if (this.shippingForm.name.trim() === '' || this.shippingForm.phone.trim() === '' || this.shippingForm.address.trim() === '' || this.shippingForm.district === '') {
+                        this.addNotification('Silakan lengkapi formulir pengiriman sebelum memproses invoice.', 'error');
+                        return;
+                    }
+
+                    // Buat object riwayat transaksi simulasi secara internal
+                    const newOrderId = 'OKUT-' + Math.floor(100000 + Math.random() * 900000);
+                    const newOrder = {
+                        id: newOrderId,
+                        outlet: this.shippingForm.name,
+                        district: this.shippingForm.district,
+                        address: this.shippingForm.address,
+                        phone: this.shippingForm.phone,
+                        total: this.getCartTotal(),
+                        weight: this.getCartTotalWeight(),
+                        date: new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }),
+                        status: 'Belum Bayar', // Status awal saat invoice dibuat
+                        items: this.cart.map(item => ({
+                            name: item.product.name,
+                            qty: item.quantity,
+                            unit: item.product.unit,
+                            price: item.product.price
+                        }))
+                    };
+
+                    // Kurangi stok produk secara lokal sesuai pembelian
+                    this.cart.forEach(item => {
+                        const pIdx = this.products.findIndex(p => p.id === item.product.id);
+                        if (pIdx > -1) {
+                            this.products[pIdx].stock = Math.max(0, this.products[pIdx].stock - item.quantity);
+                        }
+                    });
+                    localStorage.setItem('grosir_okut_products', JSON.stringify(this.products));
+
+                    this.orderHistory.unshift(newOrder);
+                    localStorage.setItem('grosir_okut_history', JSON.stringify(this.orderHistory));
+
+                    // Bersihkan form & keranjang
+                    this.cart = [];
+                    this.saveCart();
+                    this.shippingForm.address = '';
+                    this.shippingForm.district = '';
+
+                    // Pindah ke halaman riwayat pesanan dan luncurkan toast sukses
+                    this.setView('history');
+                    this.addNotification('Invoice Pemesanan #' + newOrderId + ' Berhasil Diterbitkan!', 'success');
+                },
+
+                // Simulasi Pembayaran Bank Transfer internal
+                simulatePayment(orderId) {
+                    const idx = this.orderHistory.findIndex(o => o.id === orderId);
+                    if (idx > -1) {
+                        this.orderHistory[idx].status = 'Menunggu Konfirmasi';
+                        localStorage.setItem('grosir_okut_history', JSON.stringify(this.orderHistory));
+                        this.addNotification('Bukti bayar dikirim. Menunggu verifikasi sistem...', 'success');
+
+                        // Simulasikan otomatis verifikasi admin lunas setelah 3 detik
+                        setTimeout(() => {
+                            const currentIdx = this.orderHistory.findIndex(o => o.id === orderId);
+                            if (currentIdx > -1 && this.orderHistory[currentIdx].status === 'Menunggu Konfirmasi') {
+                                this.orderHistory[currentIdx].status = 'Lunas - Diproses';
+                                localStorage.setItem('grosir_okut_history', JSON.stringify(this.orderHistory));
+                                this.addNotification('Pembayaran #' + orderId + ' diverifikasi! Pesanan sedang dikemas di gudang.', 'success');
+                            }
+                        }, 3000);
+                    }
+                },
+
+                // Fitur Detailing Struk & Print Struk
+                viewReceipt(order) {
+                    this.receiptOrder = order;
+                    this.showReceiptModal = true;
+                },
+
+                printReceipt() {
+                    window.print();
+                },
+
+                clearHistory() {
+                    this.orderHistory = [];
+                    localStorage.removeItem('grosir_okut_history');
+                    this.addNotification('Seluruh riwayat transaksi simulasi telah dibersihkan.', 'warning');
+                },
+
+                // Kontak Internal
+                submitInternalContact() {
+                    if (this.contactForm.name.trim() === '' || this.contactForm.phone.trim() === '' || this.contactForm.message.trim() === '') {
+                        this.addNotification('Mohon lengkapi formulir masukan terlebih dahulu.', 'error');
+                        return;
+                    }
+
+                    // Tambahkan ke pesan admin
+                    const newMessage = {
+                        name: this.contactForm.name,
+                        phone: this.contactForm.phone,
+                        message: this.contactForm.message,
+                        time: new Date().toLocaleString('id-ID')
+                    };
+                    this.messages.unshift(newMessage);
+                    localStorage.setItem('grosir_okut_messages', JSON.stringify(this.messages));
+
+                    // Tampilkan notifikasi sukses pengiriman pesan internal tanpa dialihkan
+                    this.addNotification('Terima kasih! Pesan Anda telah dikirim ke tim admin Grosir Okut.', 'success');
+                    
+                    // Reset formulir kontak
+                    this.contactForm.name = '';
+                    this.contactForm.phone = '';
+                    this.contactForm.message = '';
+                },
+
+
+                // ================== LOGIKA ADMIN PANEL ==================
+                // Dasbor Analitik Admin
+                getAdminRevenue() {
+                    return this.orderHistory
+                        .filter(o => o.status === 'Lunas - Diproses' || o.status === 'Dikirim' || o.status === 'Selesai')
+                        .reduce((total, o) => total + o.total, 0);
+                },
+
+                refillStock(prodId) {
+                    const idx = this.products.findIndex(p => p.id === prodId);
+                    if (idx > -1) {
+                        this.products[idx].stock += 100;
+                        localStorage.setItem('grosir_okut_products', JSON.stringify(this.products));
+                        this.addNotification('Stok produk berhasil ditambah 100 unit!', 'success');
+                    }
+                },
+
+                updateOrderStatus(orderId, newStatus) {
+                    const idx = this.orderHistory.findIndex(o => o.id === orderId);
+                    if (idx > -1) {
+                        this.orderHistory[idx].status = newStatus;
+                        localStorage.setItem('grosir_okut_history', JSON.stringify(this.orderHistory));
+                        this.addNotification(`Status Invoice #${orderId} diubah menjadi [${newStatus}]`, 'success');
+                    }
+                },
+
+                deleteOrder(orderId) {
+                    this.orderHistory = this.orderHistory.filter(o => o.id !== orderId);
+                    localStorage.setItem('grosir_okut_history', JSON.stringify(this.orderHistory));
+                    this.addNotification(`Invoice #${orderId} berhasil dihapus dari arsip gudang.`, 'warning');
+                },
+
+                // Manajemen Produk
+                openAddProductModal() {
+                    this.productModalMode = 'add';
+                    this.productForm = {
+                        name: '',
+                        category: 'Beras & Gandum',
+                        price: 15000,
+                        moq: 1,
+                        unit: 'Pcs',
+                        stock: 500,
+                        weightGram: 1000,
+                        package: 'Pack 1 Kg',
+                        image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=80',
+                        description: ''
+                    };
+                    this.showProductModal = true;
+                },
+
+                openEditProductModal(prod) {
+                    this.productModalMode = 'edit';
+                    this.selectedProductId = prod.id;
+                    this.productForm = { ...prod };
+                    this.showProductModal = true;
+                },
+
+                saveProduct() {
+                    if (this.productForm.name.trim() === '' || this.productForm.price <= 0 || this.productForm.stock < 0) {
+                        this.addNotification('Silakan isi seluruh data formulir produk dengan valid.', 'error');
+                        return;
+                    }
+
+                    if (this.productModalMode === 'add') {
+                        // Tambah produk baru
+                        const newId = Date.now();
+                        const newProduct = {
+                            id: newId,
+                            ...this.productForm
+                        };
+                        this.products.push(newProduct);
+                        this.addNotification('Produk baru berhasil ditambahkan ke katalog!', 'success');
+                    } else {
+                        // Edit produk eksis
+                        const idx = this.products.findIndex(p => p.id === this.selectedProductId);
+                        if (idx > -1) {
+                            this.products[idx] = {
+                                id: this.selectedProductId,
+                                ...this.productForm
+                            };
+                            this.addNotification('Perubahan informasi produk berhasil disimpan.', 'success');
+                        }
+                    }
+
+                    // Save to local storage
+                    localStorage.setItem('grosir_okut_products', JSON.stringify(this.products));
+                    this.showProductModal = false;
+                },
+
+                deleteProduct(prodId) {
+                    this.products = this.products.filter(p => p.id !== prodId);
+                    localStorage.setItem('grosir_okut_products', JSON.stringify(this.products));
+                    this.addNotification('Produk berhasil dihapus dari database katalog.', 'warning');
+                },
+
+                // Manajemen Pesan Masuk
+                deleteMessage(idx) {
+                    this.messages.splice(idx, 1);
+                    localStorage.setItem('grosir_okut_messages', JSON.stringify(this.messages));
+                    this.addNotification('Pesan masuk berhasil dihapus.', 'warning');
+                },
+
+                // Helper Formatting Rupiah
+                formatRupiah(number) {
+                    return new Intl.NumberFormat('id-ID', {
+                        style: 'currency',
+                        currency: 'IDR',
+                        minimumFractionDigits: 0
+                    }).format(number);
+                },
+
+                // Custom Toast Notifications
+                addNotification(message, type = 'success') {
+                    const id = Date.now();
+                    this.notifications.push({ id, message, type });
+                    setTimeout(() => {
+                        this.removeNotification(id);
+                    }, 4000);
+                },
+
+                removeNotification(id) {
+                    this.notifications = this.notifications.filter(n => n.id !== id);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
